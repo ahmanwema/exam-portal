@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -8,34 +7,34 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, BookOpen, FileText,
   BarChart3, LogOut, UserCheck, GraduationCap,
-  Clock, Menu, X,
+  Clock, Menu, X, PanelRightClose, PanelRightOpen,
 } from 'lucide-react'
 import type { UserRole } from '@/types'
 
 const navItems: Record<UserRole, { href: string; label: string; arabicLabel: string; icon: React.ElementType }[]> = {
   admin: [
-    { href: '/admin/dashboard',  label: 'Dashboard',   arabicLabel: 'لوحة التحكم',  icon: LayoutDashboard },
-    { href: '/admin/users',      label: 'Watumiaji',   arabicLabel: 'المستخدمون',    icon: Users },
-    { href: '/admin/assign',     label: 'Assign',      arabicLabel: 'تعيين',         icon: UserCheck },
-    { href: '/admin/exams',      label: 'Mitihani',    arabicLabel: 'الامتحانات',     icon: BookOpen },
-    { href: '/admin/reports',    label: 'Ripoti',      arabicLabel: 'التقارير',       icon: BarChart3 },
+    { href: '/admin/dashboard', label: 'Dashboard', arabicLabel: 'لوحة التحكم', icon: LayoutDashboard },
+    { href: '/admin/users', label: 'Watumiaji', arabicLabel: 'المستخدمون', icon: Users },
+    { href: '/admin/assign', label: 'Assign Wanafunzi', arabicLabel: 'تعيين الطلاب', icon: UserCheck },
+    { href: '/admin/exams', label: 'Mitihani Yote', arabicLabel: 'جميع الامتحانات', icon: BookOpen },
+    { href: '/admin/reports', label: 'Ripoti', arabicLabel: 'التقارير', icon: BarChart3 },
   ],
   teacher: [
     { href: '/teacher/dashboard', label: 'Dashboard', arabicLabel: 'لوحة التحكم', icon: LayoutDashboard },
-    { href: '/teacher/students',  label: 'Wanafunzi', arabicLabel: 'طلابي',        icon: GraduationCap },
-    { href: '/teacher/exams',     label: 'Mitihani',  arabicLabel: 'امتحاناتي',    icon: BookOpen },
-    { href: '/teacher/results',   label: 'Matokeo',   arabicLabel: 'النتائج',      icon: BarChart3 },
+    { href: '/teacher/students', label: 'Wanafunzi Wangu', arabicLabel: 'طلابي', icon: GraduationCap },
+    { href: '/teacher/exams', label: 'Mitihani Yangu', arabicLabel: 'امتحاناتي', icon: BookOpen },
+    { href: '/teacher/results', label: 'Matokeo', arabicLabel: 'النتائج', icon: BarChart3 },
   ],
   student: [
     { href: '/student/dashboard', label: 'Dashboard', arabicLabel: 'لوحة التحكم', icon: LayoutDashboard },
-    { href: '/student/exams',     label: 'Mitihani',  arabicLabel: 'امتحاناتي',    icon: Clock },
-    { href: '/student/results',   label: 'Matokeo',   arabicLabel: 'نتائجي',       icon: FileText },
+    { href: '/student/exams', label: 'Mitihani Yangu', arabicLabel: 'امتحاناتي', icon: Clock },
+    { href: '/student/results', label: 'Matokeo Yangu', arabicLabel: 'نتائجي', icon: FileText },
   ],
 }
 
 const roleLabel = { admin: 'Msimamizi', teacher: 'Mwalimu', student: 'Mwanafunzi' }
 const roleColor = {
-  admin:   'bg-purple-100 text-purple-700',
+  admin: 'bg-purple-100 text-purple-700',
   teacher: 'bg-blue-100 text-blue-700',
   student: 'bg-green-100 text-green-700',
 }
@@ -44,12 +43,18 @@ interface SidebarProps {
   role: UserRole
   userName: string
   userEmail: string
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
 }
 
-export function Sidebar({ role, userName, userEmail }: SidebarProps) {
+export function Sidebar({ role, userName, userEmail, open, onToggle, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+
+  function closeOnMobile() {
+    if (window.innerWidth < 1024) onClose()
+  }
 
   async function handleLogout() {
     const supabase = createClient()
@@ -57,100 +62,114 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
     router.push('/login')
   }
 
-  const items = navItems[role]
-
   return (
     <>
-      {/* ── Toggle button — inaonekana kila wakati ── */}
       <button
-        onClick={() => setOpen(!open)}
-        className="fixed top-3 left-3 z-50 w-10 h-10 bg-white border border-gray-200 rounded-xl shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
-        title={open ? 'Funga menyu' : 'Fungua menyu'}
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'fixed top-3 z-[60] hidden h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 lg:flex',
+          open ? 'right-[16.75rem]' : 'right-3'
+        )}
+        aria-label={open ? 'Ficha menyu' : 'Fungua menyu'}
+        title={open ? 'Ficha menyu' : 'Fungua menyu'}
       >
-        {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        {open ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
       </button>
 
-      {/* ── Overlay (mobile) ── */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="fixed left-3 top-3 z-[60] flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 lg:hidden"
+        aria-label={open ? 'Funga menyu' : 'Fungua menyu'}
+      >
+        {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </button>
+
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
         />
       )}
 
-      {/* ── Sidebar panel ── */}
-      {open && (
-        <aside className="fixed top-0 left-0 bottom-0 z-50 w-64 bg-white shadow-2xl flex flex-col">
-          {/* Logo + close */}
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0">
-                <BookOpen className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="font-bold text-gray-900 text-sm">Exam Portal</p>
-                <p className="text-gray-400 text-xs">مدخل الامتحانات</p>
-              </div>
+      <aside
+        className={cn(
+          'fixed bottom-0 right-0 top-0 z-50 flex w-64 flex-col border-l border-gray-200 bg-white shadow-2xl transition-transform duration-300',
+          open ? 'translate-x-0' : 'translate-x-full'
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-gray-100 p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600">
+              <BookOpen className="h-4 w-4 text-white" />
             </div>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* User */}
-          <div className="px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center font-semibold text-gray-600 text-sm shrink-0">
-                {userName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-gray-900 text-sm truncate">{userName}</p>
-                <p className="text-gray-400 text-xs truncate">{userEmail}</p>
-              </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-gray-900">Exam Portal</p>
+              <p className="truncate text-xs text-gray-400">مدخل الامتحانات</p>
             </div>
-            <span className={cn('mt-2 inline-block text-xs font-medium px-2 py-0.5 rounded-full', roleColor[role])}>
-              {roleLabel[role]}
-            </span>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+            aria-label="Funga menyu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-          {/* Nav */}
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            {items.map(({ href, label, arabicLabel, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(href + '/')
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-colors',
-                    active
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  )}
-                >
-                  <Icon className="w-5 h-5 shrink-0" />
-                  <div>
-                    <p className="leading-none">{label}</p>
-                    <p className="text-xs opacity-60 mt-0.5">{arabicLabel}</p>
-                  </div>
-                </Link>
-              )
-            })}
-          </nav>
-
-          {/* Logout */}
-          <div className="p-3 border-t border-gray-100">
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-              Toka — تسجيل الخروج
-            </button>
+        <div className="border-b border-gray-100 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-900">{userName}</p>
+              <p className="truncate text-xs text-gray-400">{userEmail}</p>
+            </div>
           </div>
-        </aside>
-      )}
+          <span className={cn('mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium', roleColor[role])}>
+            {roleLabel[role]}
+          </span>
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {navItems[role].map(({ href, label, arabicLabel, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + '/')
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={closeOnMobile}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors',
+                  active
+                    ? 'bg-blue-50 font-semibold text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="truncate leading-none">{label}</p>
+                  <p className="mt-0.5 truncate text-xs opacity-60">{arabicLabel}</p>
+                </div>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-gray-100 p-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-600 transition-colors hover:bg-red-50"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Toka - تسجيل الخروج</span>
+          </button>
+        </div>
+      </aside>
     </>
   )
 }

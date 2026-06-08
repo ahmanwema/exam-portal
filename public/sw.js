@@ -1,5 +1,4 @@
 // Service Worker v3 - clears old caches aggressively
-const CACHE_NAME = 'exam-portal-v3'
 
 self.addEventListener('install', () => {
   self.skipWaiting()
