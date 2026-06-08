@@ -47,18 +47,21 @@ export default function RegisterPage() {
     })
 
     if (signUpError) {
-      setError(signUpError.message === 'User already registered'
-        ? 'Barua pepe hii tayari imesajiliwa. Ingia badala yake.'
-        : 'Hitilafu imetokea. Jaribu tena.')
+      if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
+        setError('Barua pepe hii tayari imesajiliwa. Ingia badala yake.')
+      } else if (signUpError.message.includes('email') && signUpError.message.includes('confirm')) {
+        setError('Angalia barua pepe yako na confirm akaunti yako kwanza.')
+      } else {
+        setError(signUpError.message)
+      }
       setLoading(false)
       return
     }
 
     if (role === 'teacher') {
-      router.push('/pending')
+      window.location.href = '/pending'
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) router.push('/student/dashboard')
+      window.location.href = '/student/dashboard'
     }
   }
 
