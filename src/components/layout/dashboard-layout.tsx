@@ -22,12 +22,14 @@ export async function DashboardLayout({ children, role }: DashboardLayoutProps) 
 
   if (!profile) redirect('/login')
   if (profile.role !== role) redirect(`/${profile.role}/dashboard`)
-  if (profile.status === 'pending') redirect('/pending')
+  if (profile.status === 'pending')   redirect('/pending')
+  if (profile.status === 'suspended') redirect('/suspended')
 
   return (
     <div className="flex min-h-screen bg-gray-50" dir="rtl">
       <Sidebar role={role} userName={profile.full_name} userEmail={profile.email} />
-      <main className="flex-1 overflow-auto">
+      {/* Content — adds top padding on mobile for the fixed top bar */}
+      <main className="flex-1 overflow-auto pt-16 lg:pt-0">
         {children}
       </main>
     </div>
