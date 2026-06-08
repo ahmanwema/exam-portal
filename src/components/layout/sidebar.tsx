@@ -39,25 +39,21 @@ interface SidebarProps {
   userEmail: string
 }
 
-export function Sidebar({ role, userName, userEmail }: SidebarProps) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
+interface SidebarContentProps extends SidebarProps {
+  pathname: string
+  onClose: () => void
+  onLogout: () => void
+}
 
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
+const roleLabel = { admin: 'Msimamizi', teacher: 'Mwalimu', student: 'Mwanafunzi' }
+const roleColor = {
+  admin:   'bg-purple-100 text-purple-700',
+  teacher: 'bg-blue-100   text-blue-700',
+  student: 'bg-green-100  text-green-700',
+}
 
-  const roleLabel = { admin: 'Msimamizi', teacher: 'Mwalimu', student: 'Mwanafunzi' }
-  const roleColor = {
-    admin:   'bg-purple-100 text-purple-700',
-    teacher: 'bg-blue-100   text-blue-700',
-    student: 'bg-green-100  text-green-700',
-  }
-
-  const SidebarContent = () => (
+function SidebarContent({ role, userName, userEmail, pathname, onClose, onLogout }: SidebarContentProps) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-5 border-b border-gray-100 flex items-center justify-between">
@@ -73,7 +69,7 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
         {/* Close button — mobile only */}
         <button
           className="lg:hidden text-gray-400 hover:text-gray-600 p-1"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
         >
           <X className="w-5 h-5" />
         </button>
@@ -103,7 +99,7 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
             <Link
               key={href}
               href={href}
-              onClick={() => setOpen(false)}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-colors',
                 active
@@ -124,7 +120,7 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
       {/* Logout */}
       <div className="p-3 border-t border-gray-100">
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm text-red-600 hover:bg-red-50 transition-colors"
         >
           <LogOut className="w-5 h-5" />
@@ -133,6 +129,18 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
       </div>
     </div>
   )
+}
+
+export function Sidebar({ role, userName, userEmail }: SidebarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <>
@@ -168,12 +176,26 @@ export function Sidebar({ role, userName, userEmail }: SidebarProps) {
         'lg:hidden fixed top-0 right-0 bottom-0 z-50 w-72 bg-white shadow-2xl transition-transform duration-300',
         open ? 'translate-x-0' : 'translate-x-full'
       )}>
-        <SidebarContent />
+        <SidebarContent
+          role={role}
+          userName={userName}
+          userEmail={userEmail}
+          pathname={pathname}
+          onClose={() => setOpen(false)}
+          onLogout={handleLogout}
+        />
       </div>
 
       {/* ── Desktop sidebar ────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-64 bg-white border-l border-gray-200 h-screen sticky top-0 shrink-0">
-        <SidebarContent />
+        <SidebarContent
+          role={role}
+          userName={userName}
+          userEmail={userEmail}
+          pathname={pathname}
+          onClose={() => setOpen(false)}
+          onLogout={handleLogout}
+        />
       </aside>
     </>
   )

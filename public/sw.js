@@ -1,6 +1,6 @@
 // Simple service worker for PWA offline support
-const CACHE_NAME = 'exam-portal-v1'
-const STATIC_ASSETS = ['/', '/login', '/register', '/manifest.json']
+const CACHE_NAME = 'exam-portal-v2'
+const STATIC_ASSETS = ['/manifest.json']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -22,6 +22,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
   const url = new URL(event.request.url)
   if (url.origin !== location.origin) return
+  if (event.request.mode === 'navigate') return
 
   event.respondWith(
     fetch(event.request)
