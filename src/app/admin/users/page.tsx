@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, CheckCircle, UserX } from 'lucide-react'
+import { Search, CheckCircle, UserX, GraduationCap, School } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import type { Profile, UserStatus } from '@/types'
+import type { Profile, UserStatus, UserRole } from '@/types'
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline'
 
@@ -17,6 +17,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'pending' | 'teacher' | 'student'>('all')
   const [loading, setLoading] = useState(true)
+  const [changingRole, setChangingRole] = useState<string | null>(null)
 
   const loadProfiles = useCallback(async () => {
     const supabase = createClient()
@@ -50,6 +51,17 @@ export default function AdminUsersPage() {
     void loadProfiles()
   }
 
+  async function changeRole(id: string, newRole: UserRole) {
+    setChangingRole(id)
+    const supabase = createClient()
+    await supabase.from('profiles').update({
+      role: newRole,
+      status: newRole === 'teacher' ? 'approved' : 'approved',
+    }).eq('id', id)
+    void loadProfiles()
+    setChangingRole(null)
+  }
+
   const filtered = profiles.filter((p) => {
     const matchSearch =
       p.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -62,14 +74,10 @@ export default function AdminUsersPage() {
 
   const roleLabel: Record<string, string> = { teacher: 'Mwalimu', student: 'Mwanafunzi' }
   const statusBadge: Record<UserStatus, BadgeVariant> = {
-    approved: 'success',
-    pending: 'warning',
-    suspended: 'destructive',
+    approved: 'success', pending: 'warning', suspended: 'destructive',
   }
   const statusLabel: Record<UserStatus, string> = {
-    approved: 'Ameidhinishwa',
-    pending: 'Inasubiri',
-    suspended: 'Amesimamishwa',
+    approved: 'Ameidhinishwa', pending: 'Inasubiri', suspended: 'Amesimamishwa',
   }
 
   return (
@@ -89,14 +97,9 @@ export default function AdminUsersPage() {
             className="pr-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(['all', 'pending', 'teacher', 'student'] as const).map((f) => (
-            <Button
-              key={f}
-              variant={filter === f ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilter(f)}
-            >
+            <Button key={f} variant={filter === f ? 'default' : 'outline'} size="sm" onClick={() => setFilter(f)}>
               {f === 'all' ? 'Wote' : f === 'pending' ? 'Wanasubiri' : f === 'teacher' ? 'Walimu' : 'Wanafunzi'}
             </Button>
           ))}
@@ -115,9 +118,10 @@ export default function AdminUsersPage() {
           ) : (
             <div className="space-y-3">
               {filtered.map((profile) => (
-                <div key={profile.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div key={profile.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-xl gap-3">
+                  {/* Info */}
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-semibold text-gray-600">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-semibold text-gray-600 shrink-0">
                       {profile.full_name.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -126,33 +130,60 @@ export default function AdminUsersPage() {
                       <p className="text-xs text-gray-400">{formatDate(profile.created_at)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-right hidden sm:block">
-                      <Badge variant={profile.role === 'teacher' ? 'default' : 'secondary'}>
-                        {roleLabel[profile.role]}
-                      </Badge>
-                      <br />
-                      <Badge variant={statusBadge[profile.status]} className="mt-1">
-                        {statusLabel[profile.status]}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1">
-                      {profile.status === 'pending' && (
-                        <Button size="sm" variant="success" onClick={() => approveTeacher(profile.id)} title="Approve">
-                          <CheckCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {profile.status === 'approved' && (
-                        <Button size="sm" variant="outline" onClick={() => suspendUser(profile.id)} title="Simamisha">
-                          <UserX className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {profile.status === 'suspended' && (
-                        <Button size="sm" variant="success" onClick={() => restoreUser(profile.id)} title="Rudisha">
-                          <CheckCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Role badges */}
+                    <Badge variant={profile.role === 'teacher' ? 'default' : 'secondary'}>
+                      {roleLabel[profile.role]}
+                    </Badge>
+                    <Badge variant={statusBadge[profile.status]}>
+                      {statusLabel[profile.status]}
+                    </Badge>
+
+                    {/* Change role button */}
+                    {profile.role === 'student' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={changingRole === profile.id}
+                        onClick={() => changeRole(profile.id, 'teacher')}
+                        title="Badilisha kuwa Mwalimu"
+                        className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                      >
+                        <School className="w-3.5 h-3.5" />
+                        → Mwalimu
+                      </Button>
+                    ) : profile.role === 'teacher' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={changingRole === profile.id}
+                        onClick={() => changeRole(profile.id, 'student')}
+                        title="Badilisha kuwa Mwanafunzi"
+                        className="text-gray-600 border-gray-300 hover:bg-gray-100"
+                      >
+                        <GraduationCap className="w-3.5 h-3.5" />
+                        → Mwanafunzi
+                      </Button>
+                    ) : null}
+
+                    {/* Status actions */}
+                    {profile.status === 'pending' && (
+                      <Button size="sm" variant="success" onClick={() => approveTeacher(profile.id)} title="Idhinisha">
+                        <CheckCircle className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {profile.status === 'approved' && (
+                      <Button size="sm" variant="outline" onClick={() => suspendUser(profile.id)} title="Simamisha">
+                        <UserX className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {profile.status === 'suspended' && (
+                      <Button size="sm" variant="success" onClick={() => restoreUser(profile.id)} title="Rudisha">
+                        <CheckCircle className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
