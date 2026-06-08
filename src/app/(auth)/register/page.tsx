@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BookOpen, GraduationCap, School } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -12,8 +11,25 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 type Role = 'student' | 'teacher'
 
+function getRegisterErrorMessage(message: string) {
+  const lowerMessage = message.toLowerCase()
+
+  if (lowerMessage.includes('already registered') || lowerMessage.includes('already been registered')) {
+    return 'Barua pepe hii tayari imesajiliwa. Ingia badala yake.'
+  }
+
+  if (lowerMessage.includes('email') && lowerMessage.includes('confirm')) {
+    return 'Angalia barua pepe yako na confirm akaunti yako kwanza.'
+  }
+
+  if (lowerMessage.includes('database error') || lowerMessage.includes('saving new user')) {
+    return 'Usajili umeshindikana kwenye database. Hakikisha SQL fix ya signup imewekwa Supabase kisha jaribu tena.'
+  }
+
+  return message || 'Hitilafu imetokea. Jaribu tena.'
+}
+
 export default function RegisterPage() {
-  const router = useRouter()
   const [role, setRole] = useState<Role>('student')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -42,18 +58,17 @@ export default function RegisterPage() {
       email,
       password,
       options: {
-        data: { full_name: fullName, role, phone },
+        data: {
+          full_name: fullName.trim(),
+          role,
+          phone: phone.trim() || null,
+        },
       },
     })
 
     if (signUpError) {
-      if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
-        setError('Barua pepe hii tayari imesajiliwa. Ingia badala yake.')
-      } else if (signUpError.message.includes('email') && signUpError.message.includes('confirm')) {
-        setError('Angalia barua pepe yako na confirm akaunti yako kwanza.')
-      } else {
-        setError(signUpError.message)
-      }
+      console.error('Registration failed:', signUpError)
+      setError(getRegisterErrorMessage(signUpError.message))
       setLoading(false)
       return
     }

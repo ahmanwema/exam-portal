@@ -149,21 +149,28 @@ create table teacher_comments (
 -- ============================================================
 create or replace function handle_new_user()
 returns trigger as $$
+declare
+  v_role user_role := 'student'::user_role;
 begin
-  insert into profiles (id, full_name, email, role, status)
+  if new.raw_user_meta_data->>'role' in ('admin', 'teacher', 'student') then
+    v_role := (new.raw_user_meta_data->>'role')::user_role;
+  end if;
+
+  insert into profiles (id, full_name, email, role, status, phone)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', 'User'),
+    coalesce(nullif(trim(new.raw_user_meta_data->>'full_name'), ''), 'User'),
     new.email,
-    coalesce((new.raw_user_meta_data->>'role')::user_role, 'student'),
+    v_role,
     case
-      when coalesce(new.raw_user_meta_data->>'role', 'student') = 'teacher' then 'pending'::user_status
+      when v_role = 'teacher' then 'pending'::user_status
       else 'approved'::user_status
-    end
+    end,
+    nullif(trim(new.raw_user_meta_data->>'phone'), '')
   );
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create trigger on_auth_user_created
   after insert on auth.users

@@ -3,6 +3,43 @@
 -- ============================================================
 
 -- ============================================================
+-- FIX SIGNUP: Make auth trigger robust
+-- Prevent signup from failing when role metadata is missing/invalid,
+-- store phone when present, and pin search_path for SECURITY DEFINER.
+-- ============================================================
+
+create or replace function handle_new_user()
+returns trigger as $$
+declare
+  v_role user_role := 'student'::user_role;
+begin
+  if new.raw_user_meta_data->>'role' in ('admin', 'teacher', 'student') then
+    v_role := (new.raw_user_meta_data->>'role')::user_role;
+  end if;
+
+  insert into profiles (id, full_name, email, role, status, phone)
+  values (
+    new.id,
+    coalesce(nullif(trim(new.raw_user_meta_data->>'full_name'), ''), 'User'),
+    new.email,
+    v_role,
+    case
+      when v_role = 'teacher' then 'pending'::user_status
+      else 'approved'::user_status
+    end,
+    nullif(trim(new.raw_user_meta_data->>'phone'), '')
+  );
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists on_auth_user_created on auth.users;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure handle_new_user();
+
+-- ============================================================
 -- FIX 0: Stop profiles RLS recursion
 -- The original admin policies query profiles from inside profiles RLS.
 -- That can trigger: infinite recursion detected in policy for relation "profiles".
