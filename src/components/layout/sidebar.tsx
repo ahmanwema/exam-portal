@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -51,15 +52,30 @@ interface SidebarProps {
 export function Sidebar({ role, userName, userEmail, open, onToggle, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [loggingOut, setLoggingOut] = useState(false)
 
   function closeOnMobile() {
     if (window.innerWidth < 1024) onClose()
   }
 
   async function handleLogout() {
+    if (loggingOut) return
+    setLoggingOut(true)
+
     const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      if (error) throw error
+
+      onClose()
+      router.replace('/login')
+      router.refresh()
+      window.location.assign('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      setLoggingOut(false)
+    }
   }
 
   return (
@@ -159,14 +175,15 @@ export function Sidebar({ role, userName, userEmail, open, onToggle, onClose }: 
           })}
         </nav>
 
-        <div className="border-t border-gray-100 p-3">
+        <div className="border-t border-gray-100 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-600 transition-colors hover:bg-red-50"
+            disabled={loggingOut}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
           >
             <LogOut className="h-5 w-5" />
-            <span>Toka - تسجيل الخروج</span>
+            <span>{loggingOut ? 'Inatoka...' : 'Toka - تسجيل الخروج'}</span>
           </button>
         </div>
       </aside>
