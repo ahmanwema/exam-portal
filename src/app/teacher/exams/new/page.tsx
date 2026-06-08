@@ -29,6 +29,20 @@ export default function NewExamPage() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  function getCreateErrorMessage(message: string) {
+    const lowerMessage = message.toLowerCase()
+
+    if (lowerMessage.includes('row-level security')) {
+      return 'Huna ruhusa ya kutengeneza mtihani. Hakikisha akaunti ya mwalimu imeidhinishwa na RLS policies zipo Supabase.'
+    }
+
+    if (lowerMessage.includes('column') || lowerMessage.includes('schema cache')) {
+      return 'Database haijasasishwa kikamilifu. Run schema/security SQL kwenye Supabase kisha jaribu tena.'
+    }
+
+    return message || 'Hitilafu imetokea. Jaribu tena.'
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim()) { setError('Tafadhali weka kichwa cha mtihani'); return }
@@ -36,12 +50,18 @@ export default function NewExamPage() {
     setError('')
 
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-    const { data: exam, error: createError } = await supabase.from('exams').insert({
+    if (userError || !user) {
+      setError('Session imekwisha. Tafadhali ingia tena.')
+      setLoading(false)
+      return
+    }
+
+    const examPayload = {
       title: form.title,
       description: form.description || null,
-      teacher_id: user!.id,
+      teacher_id: user.id,
       duration_minutes: parseInt(form.duration_minutes),
       pass_marks: form.pass_marks ? parseFloat(form.pass_marks) : null,
       randomize_questions: form.randomize_questions === 'true',
@@ -49,10 +69,32 @@ export default function NewExamPage() {
       show_answers: form.show_answers === 'true',
       status: 'draft',
       total_marks: 0,
-    }).select().single()
+    }
 
-    if (createError) {
-      setError('Hitilafu imetokea. Jaribu tena.')
+    let { data: exam, error: createError } = await supabase.from('exams').insert(examPayload).select('id').single()
+
+    if (createError && (
+      createError.message.toLowerCase().includes('column') ||
+      createError.message.toLowerCase().includes('schema cache')
+    )) {
+      console.warn('Full exam insert failed, retrying with legacy payload:', createError)
+      const { data: fallbackExam, error: fallbackError } = await supabase.from('exams').insert({
+        title: form.title,
+        description: form.description || null,
+        teacher_id: user.id,
+        duration_minutes: parseInt(form.duration_minutes),
+        pass_marks: form.pass_marks ? parseFloat(form.pass_marks) : null,
+        status: 'draft',
+        total_marks: 0,
+      }).select('id').single()
+
+      exam = fallbackExam
+      createError = fallbackError
+    }
+
+    if (createError || !exam) {
+      console.error('Create exam failed:', createError)
+      setError(getCreateErrorMessage(createError?.message ?? 'Mtihani haukuundwa. Jaribu tena.'))
       setLoading(false)
       return
     }
