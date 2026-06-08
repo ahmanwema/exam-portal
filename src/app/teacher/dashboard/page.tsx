@@ -53,7 +53,7 @@ export default async function TeacherDashboard() {
   const statusVariant: Record<ExamStatus, BadgeVariant> = { draft: 'secondary', published: 'success', closed: 'destructive' }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard ya Mwalimu</h1>
@@ -65,7 +65,7 @@ export default async function TeacherDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Wanafunzi Wangu', arabicLabel: 'طلابي', value: totalStudents ?? 0, icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Mitihani Yote', arabicLabel: 'جميع الامتحانات', value: totalExams ?? 0, icon: BookOpen, color: 'text-purple-600', bg: 'bg-purple-50' },

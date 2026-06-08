@@ -53,7 +53,7 @@ export default async function StudentDashboard() {
   const completedExams = exams.filter((e) => attemptMap.has(e.id))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           مرحباً، {profile?.full_name}
@@ -62,7 +62,7 @@ export default async function StudentDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Mitihani Inayosubiri', value: availableExams.length, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50' },
           { label: 'Mitihani Iliyofanywa', value: completedExams.length, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },

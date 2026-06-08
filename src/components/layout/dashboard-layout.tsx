@@ -26,10 +26,10 @@ export async function DashboardLayout({ children, role }: DashboardLayoutProps) 
   if (profile.status === 'suspended') redirect('/suspended')
 
   return (
-    <div className="flex min-h-screen bg-gray-50" dir="rtl">
+    // dir="ltr" here — Arabic text uses dir="rtl" per-element via .arabic-text
+    <div className="flex min-h-screen bg-gray-50" dir="ltr">
       <Sidebar role={role} userName={profile.full_name} userEmail={profile.email} />
-      {/* Content — adds top padding on mobile for the fixed top bar */}
-      <main className="flex-1 overflow-auto pt-16 lg:pt-0">
+      <main className="flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0">
         {children}
       </main>
     </div>

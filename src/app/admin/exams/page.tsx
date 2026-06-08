@@ -35,7 +35,7 @@ export default async function AdminExamsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Mitihani Yote</h1>
         <p className="text-gray-500 text-sm arabic-text">جميع الامتحانات ({exams.length})</p>
