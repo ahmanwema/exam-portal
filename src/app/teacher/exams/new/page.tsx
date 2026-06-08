@@ -36,6 +36,10 @@ export default function NewExamPage() {
       return 'Huna ruhusa ya kutengeneza mtihani. Hakikisha akaunti ya mwalimu imeidhinishwa na RLS policies zipo Supabase.'
     }
 
+    if (lowerMessage.includes('infinite recursion')) {
+      return 'RLS policies za exams zina recursion. Run security_fixes.sql kwenye Supabase kisha jaribu tena.'
+    }
+
     if (lowerMessage.includes('column') || lowerMessage.includes('schema cache')) {
       return 'Database haijasasishwa kikamilifu. Run schema/security SQL kwenye Supabase kisha jaribu tena.'
     }

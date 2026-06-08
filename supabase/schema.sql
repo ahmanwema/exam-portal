@@ -233,6 +233,38 @@ create policy "Admin can update any profile"
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
 
+-- SECURITY DEFINER helpers prevent recursive RLS checks between
+-- exams and exam_assignments policies.
+create or replace function is_exam_assigned_to_current_user(p_exam_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from exam_assignments
+    where exam_id = p_exam_id
+      and student_id = auth.uid()
+  )
+$$;
+
+create or replace function is_current_user_exam_teacher(p_exam_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from exams
+    where id = p_exam_id
+      and teacher_id = auth.uid()
+  )
+$$;
+
 -- EXAMS policies
 create policy "Teachers can manage their own exams"
   on exams for all using (teacher_id = auth.uid());
@@ -245,10 +277,7 @@ create policy "Admin can manage all exams"
 create policy "Students can view published assigned exams"
   on exams for select using (
     status = 'published' and
-    exists (
-      select 1 from exam_assignments
-      where exam_id = exams.id and student_id = auth.uid()
-    )
+    is_exam_assigned_to_current_user(id)
   );
 
 -- QUESTIONS policies
@@ -362,8 +391,9 @@ create policy "Students can view their assignments"
 -- EXAM_ASSIGNMENTS policies
 create policy "Teachers can manage exam assignments"
   on exam_assignments for all using (
-    exists (select 1 from exams where id = exam_assignments.exam_id and teacher_id = auth.uid())
-  );
+    is_current_user_exam_teacher(exam_id)
+  )
+  with check (is_current_user_exam_teacher(exam_id));
 
 create policy "Admin can manage all exam assignments"
   on exam_assignments for all using (

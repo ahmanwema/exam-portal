@@ -125,6 +125,58 @@ create policy "Admin can view all comments"
   using (current_user_role() = 'admin');
 
 -- ============================================================
+-- FIX 0B: Stop exams/exam_assignments RLS recursion
+-- The exams policy checks exam_assignments, while the teacher
+-- exam_assignments policy checked exams. Use SECURITY DEFINER
+-- helpers so those relationship checks bypass RLS recursion.
+-- ============================================================
+
+create or replace function is_exam_assigned_to_current_user(p_exam_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from exam_assignments
+    where exam_id = p_exam_id
+      and student_id = auth.uid()
+  )
+$$;
+
+create or replace function is_current_user_exam_teacher(p_exam_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from exams
+    where id = p_exam_id
+      and teacher_id = auth.uid()
+  )
+$$;
+
+drop policy if exists "Students can view published assigned exams" on exams;
+drop policy if exists "Teachers can manage exam assignments" on exam_assignments;
+
+create policy "Students can view published assigned exams"
+  on exams for select
+  using (
+    status = 'published'
+    and is_exam_assigned_to_current_user(id)
+  );
+
+create policy "Teachers can manage exam assignments"
+  on exam_assignments for all
+  using (is_current_user_exam_teacher(exam_id))
+  with check (is_current_user_exam_teacher(exam_id));
+
+-- ============================================================
 -- FIX 1: Tighten RLS on exam_attempts
 -- Students may only start an attempt on an exam that is:
 --   - assigned to them
