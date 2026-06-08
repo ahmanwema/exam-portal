@@ -26,10 +26,11 @@ export async function DashboardLayout({ children, role }: DashboardLayoutProps) 
   if (profile.status === 'suspended') redirect('/suspended')
 
   return (
-    // dir="ltr" here — Arabic text uses dir="rtl" per-element via .arabic-text
-    <div className="flex min-h-screen bg-gray-50" dir="ltr">
+    <div className="min-h-screen bg-gray-50" dir="ltr">
+      {/* Toggle button + sidebar panel (client component) */}
       <Sidebar role={role} userName={profile.full_name} userEmail={profile.email} />
-      <main className="flex-1 min-w-0 overflow-x-hidden pt-14 lg:pt-0">
+      {/* Main content — starts from left edge, button floats on top */}
+      <main className="min-w-0 overflow-x-hidden pl-14">
         {children}
       </main>
     </div>
