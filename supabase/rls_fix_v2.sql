@@ -351,14 +351,31 @@ as $$
 declare
   v_uid    uuid := auth.uid();
   v_result json;
+  v_exam   exams%rowtype;
 begin
+  set local row_security = off;
+
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
   if not exists (
     select 1 from exam_assignments where exam_id = p_exam_id and student_id = v_uid
   ) then raise exception 'not_assigned'; end if;
 
-  if not exists (
-    select 1 from exams where id = p_exam_id and status = 'published'
-  ) then raise exception 'not_published'; end if;
+  select * into v_exam from exams where id = p_exam_id;
+
+  if not found or v_exam.status <> 'published' then
+    raise exception 'not_published';
+  end if;
+
+  if v_exam.start_time is not null and v_exam.start_time > now() then
+    raise exception 'exam_not_started';
+  end if;
+
+  if v_exam.end_time is not null and v_exam.end_time < now() then
+    raise exception 'exam_closed';
+  end if;
 
   select json_build_object(
     'id',                  e.id,
@@ -418,6 +435,8 @@ declare
   v_percentage   numeric;
   v_final_status attempt_status;
 begin
+  set local row_security = off;
+
   select * into v_attempt
   from exam_attempts
   where id = p_attempt_id and student_id = v_uid and status = 'in_progress'
@@ -490,6 +509,8 @@ declare
   v_total      numeric;
   v_percentage numeric;
 begin
+  set local row_security = off;
+
   select * into v_attempt from exam_attempts where id = p_attempt_id;
   if not found then raise exception 'attempt_not_found'; end if;
 
@@ -520,3 +541,58 @@ end;
 $$;
 
 grant execute on function finalize_open_grading(uuid) to authenticated;
+
+-- ── RPC: grade_open_answer ──────────────────────────────────────────
+-- Teachers grade open answers through this RPC so marks are validated
+-- server-side and RLS does not depend on nested client updates.
+
+create or replace function grade_open_answer(
+  p_answer_id uuid,
+  p_marks numeric
+)
+returns student_answers
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_answer  student_answers%rowtype;
+  v_max     numeric;
+begin
+  set local row_security = off;
+
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
+  select sa, q.marks into v_answer, v_max
+  from student_answers sa
+  join questions q on q.id = sa.question_id
+  join exam_attempts ea on ea.id = sa.attempt_id
+  join exams e on e.id = ea.exam_id
+  where sa.id = p_answer_id
+    and q.type = 'open'
+    and ea.status = 'submitted'
+    and e.teacher_id = v_uid;
+
+  if not found then
+    raise exception 'answer_not_found' using errcode = '22023';
+  end if;
+
+  if p_marks is null or p_marks < 0 or p_marks > v_max then
+    raise exception 'invalid_marks' using errcode = '22023';
+  end if;
+
+  update student_answers
+  set
+    marks_awarded = p_marks,
+    is_correct = (p_marks >= v_max)
+  where id = p_answer_id
+  returning * into v_answer;
+
+  return v_answer;
+end;
+$$;
+
+grant execute on function grade_open_answer(uuid, numeric) to authenticated;

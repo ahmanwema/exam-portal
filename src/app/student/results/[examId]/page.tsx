@@ -44,10 +44,12 @@ export default async function StudentResultDetailPage({ params }: { params: Prom
     )
   }
 
-  const { data } = await supabase
-    .from('student_answers')
-    .select('id, selected_option_id, open_answer, marks_awarded, is_correct, questions!question_id(id, text, type, marks, explanation, options(*)), options!selected_option_id(id, text)')
-    .eq('attempt_id', attempt.id)
+  const { data } = exam.show_answers
+    ? await supabase
+        .from('student_answers')
+        .select('id, selected_option_id, open_answer, marks_awarded, is_correct, questions!question_id(id, text, type, marks, explanation, options(*)), options!selected_option_id(id, text)')
+        .eq('attempt_id', attempt.id)
+    : { data: [] }
 
   const answers = (data ?? []) as unknown as AnswerRow[]
 

@@ -67,7 +67,7 @@ export default function TeacherGradingPage() {
 
     const { data: ans } = await supabase
       .from('student_answers')
-      .select('id, question_id, selected_option_id, open_answer, marks_awarded, is_correct, questions!question_id(id, text, type, marks, explanation, options(*)), options!selected_option_id(id, text)')
+      .select('id, question_id, selected_option_id, open_answer, marks_awarded, is_correct, question:questions!question_id(id, text, type, marks, explanation, options(*)), selected_option:options!selected_option_id(id, text)')
       .eq('attempt_id', id)
 
     if (ans) {
@@ -91,18 +91,26 @@ export default function TeacherGradingPage() {
 
     const openAnswers = answers.filter((a) => a.question?.type === 'open')
     const failedIds: string[] = []
+    const invalidMarks = openAnswers.filter((a) => {
+      const marks = parseFloat(openMarks[a.id] ?? '')
+      return isNaN(marks) || marks < 0 || marks > a.question.marks
+    })
+
+    if (invalidMarks.length > 0) {
+      setMessage('⚠️ Hakikisha alama zote zipo kati ya 0 na alama kamili ya swali.')
+      setSaving(false)
+      return
+    }
 
     for (const a of openAnswers) {
       const marks = parseFloat(openMarks[a.id] ?? '')
-      if (!isNaN(marks)) {
-        const { error: updateErr } = await supabase
-          .from('student_answers')
-          .update({ marks_awarded: marks })
-          .eq('id', a.id)
-        if (updateErr) {
-          console.error('Grade update failed for answer', a.id, updateErr)
-          failedIds.push(a.id)
-        }
+      const { error: updateErr } = await supabase.rpc('grade_open_answer', {
+        p_answer_id: a.id,
+        p_marks: marks,
+      })
+      if (updateErr) {
+        console.error('Grade update failed for answer', a.id, updateErr)
+        failedIds.push(a.id)
       }
     }
 

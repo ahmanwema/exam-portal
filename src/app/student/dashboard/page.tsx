@@ -24,6 +24,10 @@ interface AttemptRow {
   submitted_at: string | null
 }
 
+function getCurrentTimestamp() {
+  return Date.now()
+}
+
 export default async function StudentDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,7 +53,15 @@ export default async function StudentDashboard() {
     .map((a) => (a as unknown as { exams: ExamRow | null }).exams)
     .filter((e): e is ExamRow => e !== null)
 
-  const availableExams = exams.filter((e) => e.status === 'published' && !attemptMap.has(e.id))
+  const now = getCurrentTimestamp()
+  const isWithinExamWindow = (exam: ExamRow) => {
+    const startsOk = !exam.start_time || new Date(exam.start_time).getTime() <= now
+    const endsOk = !exam.end_time || new Date(exam.end_time).getTime() >= now
+    return startsOk && endsOk
+  }
+
+  const availableExams = exams.filter((e) => e.status === 'published' && !attemptMap.has(e.id) && isWithinExamWindow(e))
+  const unavailableExams = exams.filter((e) => e.status === 'published' && !attemptMap.has(e.id) && !isWithinExamWindow(e))
   const completedExams = exams.filter((e) => attemptMap.has(e.id))
 
   return (
@@ -106,6 +118,40 @@ export default async function StudentDashboard() {
                 </Link>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {unavailableExams.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Mitihani Iliyopangwa</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {unavailableExams.map((exam) => {
+              const hasNotStarted = exam.start_time && new Date(exam.start_time).getTime() > now
+              return (
+                <div key={exam.id} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <div>
+                    <p className="font-semibold text-gray-900 arabic-text">{exam.title}</p>
+                    <p className="text-sm text-gray-500 flex items-center gap-3 mt-1">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />{formatDuration(exam.duration_minutes)}
+                      </span>
+                      <span>Alama {exam.total_marks}</span>
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {hasNotStarted && exam.start_time
+                        ? `Utaanza ${formatDate(exam.start_time)}`
+                        : exam.end_time
+                          ? `Umefungwa ${formatDate(exam.end_time)}`
+                          : 'Haupatikani sasa'}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{hasNotStarted ? 'Bado' : 'Umefungwa'}</Badge>
+                </div>
+              )
+            })}
           </CardContent>
         </Card>
       )}
