@@ -91,6 +91,7 @@ export default function ExamTakingPage() {
             openAnswer: a.open_answer ?? undefined,
           }
         }
+        answersRef.current = aMap
         setAnswers(aMap)
       }
       setStarted(true)
@@ -200,9 +201,16 @@ export default function ExamTakingPage() {
         open_answer: ans?.openAnswer ?? null,
       }
     })
-    await supabase
+    const { error: upsertError } = await supabase
       .from('student_answers')
       .upsert(upserts, { onConflict: 'attempt_id,question_id' })
+
+    if (upsertError) {
+      console.error('Answer save failed before submit:', upsertError)
+      setError('Hitilafu ya kuhifadhi majibu. Jaribu tena.')
+      setSubmitting(false)
+      return
+    }
 
     // Call server-side grading RPC
     const { data: result, error: submitError } = await supabase.rpc('submit_exam', {

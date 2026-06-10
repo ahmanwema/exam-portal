@@ -90,24 +90,34 @@ export default function TeacherGradingPage() {
     const supabase = createClient()
 
     const openAnswers = answers.filter((a) => a.question?.type === 'open')
+    const failedIds: string[] = []
+
     for (const a of openAnswers) {
       const marks = parseFloat(openMarks[a.id] ?? '')
       if (!isNaN(marks)) {
-        await supabase
+        const { error: updateErr } = await supabase
           .from('student_answers')
           .update({ marks_awarded: marks })
           .eq('id', a.id)
+        if (updateErr) {
+          console.error('Grade update failed for answer', a.id, updateErr)
+          failedIds.push(a.id)
+        }
       }
     }
 
-    // Check if all open answers now have marks
+    if (failedIds.length > 0) {
+      setMessage(`❌ Hitilafu: Alama ${failedIds.length} hazikuhifadhiwa. Jaribu tena.`)
+      setSaving(false)
+      return
+    }
+
     const allGraded = openAnswers.every((a) => {
       const m = parseFloat(openMarks[a.id] ?? '')
       return !isNaN(m)
     })
 
     if (allGraded) {
-      // Call finalize RPC
       const { error } = await supabase.rpc('finalize_open_grading', { p_attempt_id: id })
       if (error) {
         if (error.message.includes('open_answers_incomplete')) {
@@ -117,7 +127,7 @@ export default function TeacherGradingPage() {
         }
       } else {
         setMessage('✅ Grading imekamilika. Matokeo yamehesabiwa.')
-        load()
+        void load()
       }
     } else {
       setMessage('✅ Alama zimehifadhiwa. Jaza alama zote ili kukamilisha.')
