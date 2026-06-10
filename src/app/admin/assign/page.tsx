@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,25 @@ type AssignmentRow = {
   student: { full_name: string; email: string } | null
 }
 
+function getAssignErrorMessage(error: { code?: string; message?: string }) {
+  if (error.code === '23505' || error.message?.includes('duplicate_assignment')) {
+    return 'Mwanafunzi huyu tayari amepewa mwalimu huyu.'
+  }
+  if (error.code === 'PGRST202' || error.message?.includes('assign_teacher_student_admin')) {
+    return 'Function ya assignment haipo kwenye database. Run supabase/rls_fix_v2.sql kwenye Supabase SQL Editor kisha jaribu tena.'
+  }
+  if (error.message?.includes('invalid_teacher')) {
+    return 'Mwalimu aliyechaguliwa si approved au si akaunti ya mwalimu.'
+  }
+  if (error.message?.includes('invalid_student')) {
+    return 'Mwanafunzi aliyechaguliwa si approved au si akaunti ya mwanafunzi.'
+  }
+  if (error.code === '42501' || error.message?.includes('admin_only')) {
+    return 'Huna ruhusa ya kufanya assignment hii.'
+  }
+  return error.message ? `Hitilafu imetokea: ${error.message}` : 'Hitilafu imetokea. Jaribu tena.'
+}
+
 export default function AdminAssignPage() {
   const [teachers, setTeachers] = useState<Profile[]>([])
   const [students, setStudents] = useState<Profile[]>([])
@@ -26,17 +45,31 @@ export default function AdminAssignPage() {
   const [selectedStudent, setSelectedStudent] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
-    const [{ data: tData }, { data: sData }, { data: aData }] = await Promise.all([
+    const [{ data: tData, error: tErr }, { data: sData, error: sErr }, { data: aRaw, error: aErr }] = await Promise.all([
       supabase.from('profiles').select('*').eq('role', 'teacher').eq('status', 'approved'),
       supabase.from('profiles').select('*').eq('role', 'student').eq('status', 'approved'),
-      supabase.from('teacher_students').select('id, teacher_id, student_id, assigned_at, teacher:profiles!teacher_id(full_name, email), student:profiles!student_id(full_name, email)'),
+      supabase.from('teacher_students').select('id, teacher_id, student_id, assigned_at'),
     ])
+    if (tErr) console.error('loadData teachers error:', tErr)
+    if (sErr) console.error('loadData students error:', sErr)
+    if (aErr) console.error('loadData assignments error:', aErr)
+
+    const teacherMap = Object.fromEntries((tData ?? []).map(p => [p.id, { full_name: p.full_name, email: p.email }]))
+    const studentMap = Object.fromEntries((sData ?? []).map(p => [p.id, { full_name: p.full_name, email: p.email }]))
+
+    const mapped: AssignmentRow[] = (aRaw ?? []).map(a => ({
+      ...a,
+      teacher: teacherMap[a.teacher_id] ?? null,
+      student: studentMap[a.student_id] ?? null,
+    }))
+
     setTeachers(tData ?? [])
     setStudents(sData ?? [])
-    setAssignments((aData ?? []) as unknown as AssignmentRow[])
+    setAssignments(mapped)
   }, [])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -46,17 +79,22 @@ export default function AdminAssignPage() {
     if (!selectedTeacher || !selectedStudent) return
     setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.from('teacher_students').insert({
-      teacher_id: selectedTeacher,
-      student_id: selectedStudent,
+    const { error } = await supabase.rpc('assign_teacher_student_admin', {
+      p_teacher_id: selectedTeacher,
+      p_student_id: selectedStudent,
     })
+
     if (error) {
-      setMessage(error.code === '23505' ? '⚠️ Mwanafunzi huyu tayari amepewa mwalimu huyu.' : '❌ Hitilafu imetokea.')
+      console.error('teacher_students assignment error:', error)
+      setMessageType('error')
+      setMessage(getAssignErrorMessage(error))
     } else {
-      setMessage('✅ Imefanikiwa! Mwanafunzi amepewa mwalimu.')
+      setMessageType('success')
+      setMessage('Imefanikiwa! Mwanafunzi amepewa mwalimu.')
       setSelectedStudent('')
-      loadData()
+      void loadData()
     }
+
     setLoading(false)
     setTimeout(() => setMessage(''), 3000)
   }
@@ -67,10 +105,10 @@ export default function AdminAssignPage() {
     void loadData()
   }
 
-  const assignmentsByTeacher = assignments.reduce((acc: Record<string, AssignmentRow[]>, a) => {
-    const tid = a.teacher_id
-    if (!acc[tid]) acc[tid] = []
-    acc[tid].push(a)
+  const assignmentsByTeacher = assignments.reduce((acc: Record<string, AssignmentRow[]>, assignment) => {
+    const teacherId = assignment.teacher_id
+    if (!acc[teacherId]) acc[teacherId] = []
+    acc[teacherId].push(assignment)
     return acc
   }, {})
 
@@ -81,7 +119,6 @@ export default function AdminAssignPage() {
         <p className="text-gray-500 text-sm arabic-text">تعيين الطلاب للمعلمين</p>
       </div>
 
-      {/* Assignment Form */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -90,7 +127,7 @@ export default function AdminAssignPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {message && (
-            <div className={`text-sm px-4 py-3 rounded-lg ${message.startsWith('✅') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            <div className={`text-sm px-4 py-3 rounded-lg ${messageType === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
               {message}
             </div>
           )}
@@ -102,8 +139,8 @@ export default function AdminAssignPage() {
                   <SelectValue placeholder="Chagua mwalimu..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {teachers.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.full_name} — {t.email}</SelectItem>
+                  {teachers.map((teacher) => (
+                    <SelectItem key={teacher.id} value={teacher.id}>{teacher.full_name} — {teacher.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -115,8 +152,8 @@ export default function AdminAssignPage() {
                   <SelectValue placeholder="Chagua mwanafunzi..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.full_name} — {s.email}</SelectItem>
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>{student.full_name} — {student.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -128,7 +165,6 @@ export default function AdminAssignPage() {
         </CardContent>
       </Card>
 
-      {/* Current Assignments */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Assignments za Sasa ({assignments.length})</CardTitle>
@@ -140,7 +176,7 @@ export default function AdminAssignPage() {
             <div className="space-y-6">
               {Object.entries(assignmentsByTeacher).map(([teacherId, teacherAssignments]) => {
                 const teacherProfile =
-                  teachers.find((t) => t.id === teacherId) ?? teacherAssignments[0]?.teacher
+                  teachers.find((teacher) => teacher.id === teacherId) ?? teacherAssignments[0]?.teacher
                 return (
                   <div key={teacherId}>
                     <div className="flex items-center gap-2 mb-3">
@@ -153,10 +189,10 @@ export default function AdminAssignPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mr-10">
-                      {teacherAssignments.map((a) => (
-                        <Badge key={a.id} variant="secondary" className="flex items-center gap-1 pr-1">
-                          {a.student?.full_name}
-                          <button onClick={() => removeAssignment(a.id)} className="hover:text-red-500 ml-1">
+                      {teacherAssignments.map((assignment) => (
+                        <Badge key={assignment.id} variant="secondary" className="flex items-center gap-1 pr-1">
+                          {assignment.student?.full_name}
+                          <button onClick={() => removeAssignment(assignment.id)} className="hover:text-red-500 ml-1">
                             <X className="w-3 h-3" />
                           </button>
                         </Badge>
