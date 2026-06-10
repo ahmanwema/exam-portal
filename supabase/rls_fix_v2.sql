@@ -19,7 +19,6 @@ create or replace function current_user_role()
 returns user_role
 language plpgsql
 security definer
-stable
 set search_path = public
 as $$
 declare
@@ -35,7 +34,6 @@ create or replace function current_user_status()
 returns user_status
 language plpgsql
 security definer
-stable
 set search_path = public
 as $$
 declare
@@ -104,7 +102,6 @@ create or replace function is_exam_assigned_to_current_user(p_exam_id uuid)
 returns boolean
 language plpgsql
 security definer
-stable
 set search_path = public
 as $$
 declare
@@ -127,7 +124,6 @@ create or replace function is_current_user_exam_teacher(p_exam_id uuid)
 returns boolean
 language plpgsql
 security definer
-stable
 set search_path = public
 as $$
 declare
@@ -236,3 +232,34 @@ create policy "Admin can manage assignments"
 create policy "Admin can view all comments"
   on teacher_comments for select
   using (current_user_role() = 'admin');
+
+-- ── Fix questions/options: allow viewing for completed attempts ──────
+-- Original policy only allows 'in_progress'. After submission the
+-- attempt is 'submitted'/'graded', so results page gets null questions.
+
+drop policy if exists "Students can view questions during active attempt" on questions;
+drop policy if exists "Students can view questions for their attempts"    on questions;
+
+create policy "Students can view questions for their attempts"
+  on questions for select using (
+    exists (
+      select 1 from exam_attempts
+      where exam_id = questions.exam_id
+        and student_id = auth.uid()
+        and status in ('in_progress', 'submitted', 'graded')
+    )
+  );
+
+drop policy if exists "Students can view options during active attempt" on options;
+drop policy if exists "Students can view options for their attempts"    on options;
+
+create policy "Students can view options for their attempts"
+  on options for select using (
+    exists (
+      select 1 from questions q
+      join exam_attempts ea on ea.exam_id = q.exam_id
+      where q.id = options.question_id
+        and ea.student_id = auth.uid()
+        and ea.status in ('in_progress', 'submitted', 'graded')
+    )
+  );

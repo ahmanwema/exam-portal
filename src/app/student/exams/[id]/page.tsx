@@ -27,6 +27,8 @@ export default function ExamTakingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const saveTimerRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  // Keep a ref to answers so auto-submit timer always sees the latest answers
+  const answersRef = useRef<AnswerMap>({})
 
   const loadExam = useCallback(async () => {
     const supabase = createClient()
@@ -149,10 +151,10 @@ export default function ExamTakingPage() {
   async function saveCurrentAnswer() {
     if (!attempt) return
     const q = questions[currentQ]
-    const ans = answers[q.id]
+    const ans = answersRef.current[q.id]
     if (!ans) return
     const supabase = createClient()
-    await supabase.from('student_answers').upsert(
+    const { error: saveErr } = await supabase.from('student_answers').upsert(
       {
         attempt_id: attempt.id,
         question_id: q.id,
@@ -161,14 +163,23 @@ export default function ExamTakingPage() {
       },
       { onConflict: 'attempt_id,question_id' }
     )
+    if (saveErr) console.error('Auto-save failed:', saveErr)
   }
 
   function selectOption(questionId: string, optionId: string) {
-    setAnswers((prev) => ({ ...prev, [questionId]: { optionId } }))
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: { optionId } }
+      answersRef.current = next
+      return next
+    })
   }
 
   function setOpenAnswer(questionId: string, text: string) {
-    setAnswers((prev) => ({ ...prev, [questionId]: { openAnswer: text } }))
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: { openAnswer: text } }
+      answersRef.current = next
+      return next
+    })
   }
 
   async function handleSubmit() {
@@ -178,9 +189,10 @@ export default function ExamTakingPage() {
 
     const supabase = createClient()
 
-    // Persist all answers first
+    // Use ref so timer-triggered auto-submit always has the latest answers
+    const latestAnswers = answersRef.current
     const upserts = questions.map((q) => {
-      const ans = answers[q.id]
+      const ans = latestAnswers[q.id]
       return {
         attempt_id: attempt.id,
         question_id: q.id,
