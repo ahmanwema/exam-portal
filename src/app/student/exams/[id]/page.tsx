@@ -117,13 +117,13 @@ export default function ExamTakingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt, exam, started])
 
-  // Auto-save answers every 30 seconds
+  // Auto-save ALL answers every 30 seconds
   useEffect(() => {
     if (!attempt) return
-    saveTimerRef.current = setInterval(() => saveCurrentAnswer(), 30_000)
+    saveTimerRef.current = setInterval(() => void saveAllAnswers(), 30_000)
     return () => clearInterval(saveTimerRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attempt, answers, currentQ])
+  }, [attempt])
 
   async function startExam() {
     const supabase = createClient()
@@ -149,21 +149,25 @@ export default function ExamTakingPage() {
     setStarted(true)
   }
 
-  async function saveCurrentAnswer() {
+  async function saveAllAnswers() {
     if (!attempt) return
-    const q = questions[currentQ]
-    const ans = answersRef.current[q.id]
-    if (!ans) return
     const supabase = createClient()
-    const { error: saveErr } = await supabase.from('student_answers').upsert(
-      {
-        attempt_id: attempt.id,
-        question_id: q.id,
-        selected_option_id: ans.optionId ?? null,
-        open_answer: ans.openAnswer ?? null,
-      },
-      { onConflict: 'attempt_id,question_id' }
-    )
+    const toSave = questions
+      .map((q) => {
+        const ans = answersRef.current[q.id]
+        if (!ans) return null
+        return {
+          attempt_id: attempt.id,
+          question_id: q.id,
+          selected_option_id: ans.optionId ?? null,
+          open_answer: ans.openAnswer ?? null,
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+    if (toSave.length === 0) return
+    const { error: saveErr } = await supabase
+      .from('student_answers')
+      .upsert(toSave, { onConflict: 'attempt_id,question_id' })
     if (saveErr) console.error('Auto-save failed:', saveErr)
   }
 
@@ -411,7 +415,7 @@ export default function ExamTakingPage() {
           <div className="flex gap-3 justify-between">
             <Button
               variant="outline"
-              onClick={() => setCurrentQ((p) => Math.max(0, p - 1))}
+              onClick={async () => { await saveAllAnswers(); setCurrentQ((p) => Math.max(0, p - 1)) }}
               disabled={currentQ === 0}
             >
               السابق ←
@@ -419,7 +423,7 @@ export default function ExamTakingPage() {
             {currentQ < questions.length - 1 ? (
               <Button
                 onClick={async () => {
-                  await saveCurrentAnswer()
+                  await saveAllAnswers()
                   setCurrentQ((p) => p + 1)
                 }}
               >
@@ -444,7 +448,7 @@ export default function ExamTakingPage() {
                 return (
                   <button
                     key={qItem.id}
-                    onClick={() => setCurrentQ(i)}
+                    onClick={async () => { await saveAllAnswers(); setCurrentQ(i) }}
                     className={`w-full aspect-square rounded-lg text-xs font-medium transition-colors ${
                       i === currentQ   ? 'bg-blue-600 text-white' :
                       answered        ? 'bg-green-100 text-green-700' :

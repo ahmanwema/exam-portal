@@ -603,3 +603,20 @@ end;
 $$;
 
 grant execute on function grade_open_answer(uuid, numeric) to authenticated;
+
+-- ── Allow students to see exam metadata for their attempted exams ────
+-- Without this policy, closed/draft exams return null on the results
+-- and dashboard pages, even though the student has a submitted attempt.
+
+drop policy if exists "Students can view their attempted exams" on exams;
+
+create policy "Students can view their attempted exams"
+  on exams for select
+  using (
+    exists (
+      select 1 from exam_attempts
+      where exam_id = exams.id
+        and student_id = auth.uid()
+        and status in ('submitted', 'graded')
+    )
+  );

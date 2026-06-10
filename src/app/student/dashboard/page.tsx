@@ -175,13 +175,15 @@ export default async function StudentDashboard() {
                   </div>
                   <div className="flex items-center gap-3">
                     {attempt?.percentage != null ? (
-                      <p className="font-bold text-gray-900">{attempt.percentage}%</p>
+                      <>
+                        <p className="font-bold text-gray-900">{attempt.percentage}%</p>
+                        <Link href={`/student/results/${exam.id}`} className="text-blue-600 text-sm hover:underline">
+                          Angalia
+                        </Link>
+                      </>
                     ) : (
                       <Badge variant="secondary">Inasubiri Matokeo</Badge>
                     )}
-                    <Link href={`/student/results/${exam.id}`} className="text-blue-600 text-sm hover:underline">
-                      Angalia
-                    </Link>
                   </div>
                 </div>
               )

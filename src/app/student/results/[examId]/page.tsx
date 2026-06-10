@@ -27,7 +27,7 @@ export default async function StudentResultDetailPage({ params }: { params: Prom
 
   const { data: attempt } = await supabase
     .from('exam_attempts')
-    .select('id, score, percentage, submitted_at, exams!exam_id(id, title, total_marks, show_results, show_answers, pass_marks)')
+    .select('id, status, score, percentage, submitted_at, exams!exam_id(id, title, total_marks, show_results, show_answers, pass_marks)')
     .eq('exam_id', examId)
     .eq('student_id', user!.id)
     .single()
@@ -35,6 +35,18 @@ export default async function StudentResultDetailPage({ params }: { params: Prom
   if (!attempt) redirect('/student/results')
 
   const exam = (attempt as unknown as { exams: { id: string; title: string; total_marks: number; show_results: boolean; show_answers: boolean; pass_marks: number | null } | null }).exams
+
+  const attemptStatus = (attempt as { status?: string }).status
+  const isPendingGrading = attemptStatus === 'submitted'
+
+  if (isPendingGrading) {
+    return (
+      <div className="p-6 text-center py-20">
+        <p className="text-gray-500 text-lg">Mtihani unasubiri kusahihishwa na mwalimu.</p>
+        <p className="text-gray-400 text-sm mt-2 arabic-text">الامتحان ينتظر تصحيح المعلم</p>
+      </div>
+    )
+  }
 
   if (!exam?.show_results) {
     return (
