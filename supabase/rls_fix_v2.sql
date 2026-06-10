@@ -566,19 +566,26 @@ begin
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
 
-  select sa, q.marks into v_answer, v_max
-  from student_answers sa
-  join questions q on q.id = sa.question_id
-  join exam_attempts ea on ea.id = sa.attempt_id
-  join exams e on e.id = ea.exam_id
-  where sa.id = p_answer_id
-    and q.type = 'open'
-    and ea.status = 'submitted'
-    and e.teacher_id = v_uid;
+  select s.* into v_answer
+  from (
+    select sa.*
+    from student_answers sa
+    join questions q on q.id = sa.question_id
+    join exam_attempts ea on ea.id = sa.attempt_id
+    join exams e on e.id = ea.exam_id
+    where sa.id = p_answer_id
+      and q.type = 'open'
+      and ea.status = 'submitted'
+      and e.teacher_id = v_uid
+  ) s;
 
   if not found then
     raise exception 'answer_not_found' using errcode = '22023';
   end if;
+
+  select q.marks into v_max
+  from questions q
+  where q.id = v_answer.question_id;
 
   if p_marks is null or p_marks < 0 or p_marks > v_max then
     raise exception 'invalid_marks' using errcode = '22023';
