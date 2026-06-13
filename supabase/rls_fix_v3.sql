@@ -107,6 +107,32 @@ create policy "Students can view their exam assignments"
   on exam_assignments for select
   using (student_id = auth.uid());
 
+-- ── Rebuild exam_attempts policies ──────────────────────────────────
+-- "Students can view their attempted exams" (on exams) reads exam_attempts,
+-- and the old exam_attempts teacher policy reads back exams → new cycle.
+-- Fix: use is_current_user_exam_teacher (row_security=off) here too.
+
+drop policy if exists "Teachers can view their students attempts"  on exam_attempts;
+drop policy if exists "Admin can view all attempts"               on exam_attempts;
+
+create policy "Teachers can view their students attempts"
+  on exam_attempts for select
+  using (is_current_user_exam_teacher(exam_id));
+
+create policy "Admin can view all attempts"
+  on exam_attempts for select
+  using (current_user_role() = 'admin');
+
+-- ── Rebuild teacher_students admin policy ────────────────────────────
+-- Old policy queries profiles directly inside a profiles policy → cycle.
+
+drop policy if exists "Admin can manage assignments" on teacher_students;
+
+create policy "Admin can manage assignments"
+  on teacher_students for all
+  using (current_user_role() = 'admin')
+  with check (current_user_role() = 'admin');
+
 -- ── Rebuild profiles admin policies ─────────────────────────────────
 
 drop policy if exists "Admin can view all profiles"   on profiles;
