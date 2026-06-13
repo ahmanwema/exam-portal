@@ -37,7 +37,7 @@ export default function NewExamPage() {
     }
 
     if (lowerMessage.includes('infinite recursion')) {
-      return 'RLS policies za exams zina recursion. Run security_fixes.sql kwenye Supabase kisha jaribu tena.'
+      return 'RLS recursion error. Nenda Supabase SQL Editor → chagua faili rls_fix_v3.sql → Run. Kisha jaribu tena.'
     }
 
     if (lowerMessage.includes('column') || lowerMessage.includes('schema cache')) {
